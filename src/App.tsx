@@ -38,8 +38,19 @@ const LANGUAGES = [
   'Turkish'
 ]
 
+const MODELS = [
+  { id: 'openai/gpt-4o', name: 'GPT-4o (Recommended)', description: 'Most capable, balanced' },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and affordable' },
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Excellent creative writing' },
+  { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', description: 'Quick responses' },
+  { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5', description: 'Google\'s latest model' },
+  { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', description: 'Open source, powerful' },
+  { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B', description: 'Open source, efficient' }
+]
+
 function App() {
   const [apiKey, setApiKey] = useKV<string>('openrouter-api-key', '')
+  const [selectedModel, setSelectedModel] = useKV<string>('selected-model', 'openai/gpt-4o')
   const [tempApiKey, setTempApiKey] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
@@ -103,7 +114,7 @@ Return your response in the following JSON format:
           'HTTP-Referer': window.location.origin,
         },
         body: JSON.stringify({
-          model: 'openai/gpt-4o-mini',
+          model: selectedModel,
           messages: [
             { role: 'user', content: prompt }
           ],
@@ -258,6 +269,28 @@ Return your response in the following JSON format:
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="model">AI Model</Label>
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger id="model">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">{model.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Different models have varying capabilities and costs
+                </p>
               </div>
 
               <div className="space-y-2">
