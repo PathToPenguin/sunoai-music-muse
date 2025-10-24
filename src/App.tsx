@@ -1,22 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { MusicNotes, Gear, Sparkle, Copy, Check, Info } from '@phosphor-icons/react'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { MusicNotes, Gear, Sparkle, Copy, Check, Info, CaretUpDown, MagnifyingGlass } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { cn } from '@/lib/utils'
 
 interface GeneratedContent {
   lyrics: string
   prompt: string
+}
+
+interface OpenRouterModel {
+  id: string
+  name: string
+  description?: string
+  context_length: number
+  pricing: {
+    prompt: string
+    completion: string
+  }
+  top_provider?: {
+    max_completion_tokens?: number
+  }
 }
 
 const LANGUAGES = [
@@ -38,21 +54,15 @@ const LANGUAGES = [
   'Turkish'
 ]
 
-const MODELS = [
-  { id: 'openai/gpt-4o', name: 'GPT-4o (Recommended)', description: 'Most capable, balanced' },
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and affordable' },
-  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Excellent creative writing' },
-  { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', description: 'Quick responses' },
-  { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5', description: 'Google\'s latest model' },
-  { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', description: 'Open source, powerful' },
-  { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B', description: 'Open source, efficient' }
-]
-
 function App() {
   const [apiKey, setApiKey] = useKV<string>('openrouter-api-key', '')
   const [selectedModel, setSelectedModel] = useKV<string>('selected-model', 'openai/gpt-4o')
   const [tempApiKey, setTempApiKey] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  
+  const [availableModels, setAvailableModels] = useState<OpenRouterModel[]>([])
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
+  const [modelSearchOpen, setModelSearchOpen] = useState(false)
   
   const [musicStyle, setMusicStyle] = useState('')
   const [language, setLanguage] = useState('English')
@@ -64,6 +74,38 @@ function App() {
   
   const [lyricscopied, setLyricsCopied] = useState(false)
   const [promptCopied, setPromptCopied] = useState(false)
+
+  useEffect(() => {
+    fetchAvailableModels()
+  }, [])
+
+  const fetchAvailableModels = async () => {
+    setIsLoadingModels(true)
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models')
+      if (!response.ok) {
+        throw new Error('Failed to fetch models')
+      }
+      const data = await response.json()
+      setAvailableModels(data.data || [])
+    } catch (err) {
+      console.error('Error fetching models:', err)
+      toast.error('Failed to load available models')
+      setAvailableModels([
+        {
+          id: 'openai/gpt-4o',
+          name: 'GPT-4o',
+          description: 'Most capable model',
+          context_length: 128000,
+          pricing: { prompt: '0', completion: '0' }
+        }
+      ])
+    } finally {
+      setIsLoadingModels(false)
+    }
+  }
+
+  const selectedModelData = availableModels.find(m => m.id === selectedModel)
 
   const handleSaveApiKey = () => {
     setApiKey(tempApiKey.trim())
@@ -257,39 +299,122 @@ Return your response in the following JSON format:
 
               <div className="space-y-2">
                 <Label htmlFor="language">Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger id="language">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGES.map((lang) => (
-                      <SelectItem key={lang} value={lang}>
-                        {lang}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {language}
+                      <CaretUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search language..." />
+                      <CommandList>
+                        <CommandEmpty>No language found.</CommandEmpty>
+                        <CommandGroup>
+                          {LANGUAGES.map((lang) => (
+                            <CommandItem
+                              key={lang}
+                              value={lang}
+                              onSelect={() => {
+                                setLanguage(lang)
+                              }}
+                            >
+                              {lang}
+                              {language === lang && (
+                                <Check className="ml-auto h-4 w-4" />
+                              )}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="model">AI Model</Label>
-                <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger id="model">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODELS.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{model.name}</span>
-                          <span className="text-xs text-muted-foreground">{model.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={modelSearchOpen} onOpenChange={setModelSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={modelSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      <div className="flex flex-col items-start text-left truncate flex-1 min-w-0">
+                        <span className="font-medium truncate w-full">
+                          {selectedModelData?.name || selectedModel}
+                        </span>
+                        {selectedModelData?.description && (
+                          <span className="text-xs text-muted-foreground truncate w-full">
+                            {selectedModelData.description}
+                          </span>
+                        )}
+                      </div>
+                      <CaretUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[600px] p-0" align="start">
+                    <Command>
+                      <div className="flex items-center border-b px-3">
+                        <MagnifyingGlass className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <CommandInput placeholder="Search models..." className="h-11" />
+                      </div>
+                      <CommandList>
+                        <CommandEmpty>
+                          {isLoadingModels ? 'Loading models...' : 'No models found.'}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {availableModels.map((model) => (
+                            <CommandItem
+                              key={model.id}
+                              value={`${model.id} ${model.name}`}
+                              onSelect={() => {
+                                setSelectedModel(model.id)
+                                setModelSearchOpen(false)
+                              }}
+                              className="flex items-start gap-2 py-3"
+                            >
+                              <Check
+                                className={cn(
+                                  "mt-1 h-4 w-4 shrink-0",
+                                  selectedModel === model.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{model.name}</span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {model.id.split('/')[0]}
+                                  </Badge>
+                                </div>
+                                {model.description && (
+                                  <span className="text-xs text-muted-foreground line-clamp-2">
+                                    {model.description}
+                                  </span>
+                                )}
+                                <div className="flex gap-3 text-xs text-muted-foreground">
+                                  <span>Context: {model.context_length.toLocaleString()}</span>
+                                  <span>
+                                    Prompt: ${parseFloat(model.pricing.prompt) * 1000000}/M
+                                  </span>
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-muted-foreground">
-                  Different models have varying capabilities and costs
+                  {availableModels.length} models available • Different models have varying capabilities and costs
                 </p>
               </div>
 
