@@ -36,6 +36,7 @@ interface OpenRouterModel {
 }
 
 const LANGUAGES = [
+  'None (Instrumental)',
   'English',
   'Spanish',
   'French',
@@ -55,7 +56,7 @@ const LANGUAGES = [
 ]
 
 function App() {
-  const [apiKey, setApiKey] = useKV<string>('openrouter-api-key', '')
+  const [apiKey, setApiKey] = useState<string>('')
   const [selectedModel, setSelectedModel] = useKV<string>('selected-model', 'openai/gpt-4o')
   const [tempApiKey, setTempApiKey] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -65,7 +66,7 @@ function App() {
   const [modelSearchOpen, setModelSearchOpen] = useState(false)
   
   const [musicStyle, setMusicStyle] = useState('')
-  const [language, setLanguage] = useState('English')
+  const [language, setLanguage] = useState('None (Instrumental)')
   const [additionalInfo, setAdditionalInfo] = useState('')
   
   const [isGenerating, setIsGenerating] = useState(false)
@@ -109,7 +110,7 @@ function App() {
 
   const handleSaveApiKey = () => {
     setApiKey(tempApiKey.trim())
-    toast.success('API key saved successfully')
+    toast.success('API key saved for this session')
     setIsSettingsOpen(false)
   }
 
@@ -129,7 +130,12 @@ function App() {
     setGeneratedContent(null)
 
     try {
-      const prompt = `You are a creative songwriting assistant. Generate original song lyrics and a SunoAI prompt based on the following specifications:
+      const isInstrumental = language === 'None (Instrumental)'
+      const lyricsInstruction = isInstrumental 
+        ? 'This should be an INSTRUMENTAL track with NO LYRICS. Return empty string for lyrics field.'
+        : `Create completely original lyrics with clear verse/chorus structure. The lyrics should be in ${language}`
+      
+      const prompt = `You are a creative songwriting assistant. Generate ${isInstrumental ? 'an instrumental music description' : 'original song lyrics'} and a SunoAI prompt based on the following specifications:
 
 Music Style: ${musicStyle}
 Language: ${language}
@@ -137,14 +143,14 @@ Additional Context: ${additionalInfo || 'None'}
 
 IMPORTANT RULES:
 1. DO NOT reference any existing artist names, band names, or copyrighted song titles
-2. Create completely original lyrics with clear verse/chorus structure
-3. The lyrics should be in ${language}
-4. The SunoAI prompt should be concise (under 120 characters) and describe the style without using copyrighted references
-5. Use descriptive words for style (e.g., "upbeat electronic" instead of "like Daft Punk")
+2. ${lyricsInstruction}
+3. The SunoAI prompt should be concise (under 120 characters) and describe the style without using copyrighted references
+4. Use descriptive words for style (e.g., "upbeat electronic" instead of "like Daft Punk")
+${isInstrumental ? '5. For instrumental tracks, the lyrics field should be empty string' : '5. Include [Verse 1], [Chorus], [Verse 2], etc. labels in the lyrics'}
 
 Return your response in the following JSON format:
 {
-  "lyrics": "The complete song lyrics with [Verse 1], [Chorus], [Verse 2], etc. labels",
+  "lyrics": "${isInstrumental ? '' : 'The complete song lyrics with structure labels'}",
   "prompt": "A concise SunoAI-style prompt describing the music style"
 }`
 
@@ -239,12 +245,15 @@ Return your response in the following JSON format:
                     onChange={(e) => setTempApiKey(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
+                    Your API key is stored only in this session and will be cleared when you close the browser
+                  </p>
+                  <p className="text-xs text-muted-foreground">
                     Get your API key from{' '}
                     <a 
                       href="https://openrouter.ai/keys" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-accent hover:underline"
+                      className="text-primary hover:underline"
                     >
                       openrouter.ai/keys
                     </a>
@@ -461,34 +470,36 @@ Return your response in the following JSON format:
                 transition={{ duration: 0.3 }}
                 className="space-y-4"
               >
-                <Card className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">Generated Lyrics</h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(generatedContent.lyrics, 'lyrics')}
-                      >
-                        {lyricscopied ? (
-                          <>
-                            <Check size={16} className="mr-2 text-green-600" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={16} className="mr-2" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
+                {generatedContent.lyrics && (
+                  <Card className="p-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Generated Lyrics</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(generatedContent.lyrics, 'lyrics')}
+                        >
+                          {lyricscopied ? (
+                            <>
+                              <Check size={16} className="mr-2 text-green-600" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={16} className="mr-2" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <Separator />
+                      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                        {generatedContent.lyrics}
+                      </pre>
                     </div>
-                    <Separator />
-                    <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                      {generatedContent.lyrics}
-                    </pre>
-                  </div>
-                </Card>
+                  </Card>
+                )}
 
                 <Card className="p-6">
                   <div className="space-y-4">
