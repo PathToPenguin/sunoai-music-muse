@@ -165,14 +165,23 @@ npm run optimize    # Optimize dependencies
 
 ### Testing
 - No test framework currently configured
-- Manual testing recommended for UI changes
-- Test all form interactions and API flows
-- Verify responsive behavior on mobile/desktop
+- Manual testing recommended for all changes:
+  - Test form inputs and validation
+  - Verify API key storage and retrieval (KV storage)
+  - Test content generation flow with valid/invalid inputs
+  - Check copy-to-clipboard functionality
+  - Test all button states (hover, active, disabled, loading)
+  - Verify toast notifications appear correctly
+  - Test responsive behavior on mobile (< 768px) and desktop
+  - Check keyboard navigation and accessibility
 
 ### Linting
-- ESLint configured in package.json but config file needs migration
-- Uses `eslint-plugin-react-hooks` and `eslint-plugin-react-refresh`
-- TypeScript ESLint parser and rules
+- ESLint 9.28.0 is installed but requires an `eslint.config.js` file (ESLint flat config format)
+- If creating the ESLint config, use:
+  - `eslint-plugin-react-hooks` for React hooks rules
+  - `eslint-plugin-react-refresh` for fast refresh compatibility
+  - `typescript-eslint` for TypeScript-specific linting
+  - Follow ESLint v9 flat config format (not legacy .eslintrc)
 
 ## Best Practices
 
