@@ -170,8 +170,10 @@ export const EXAMPLE_PROMPTS: ExamplePrompt[] = [
 
 /**
  * Gets a random example prompt
+ * Note: Uses Math.random() for non-security-critical random selection of examples
  */
 export function getRandomExample(): ExamplePrompt {
+  // Not security-sensitive: just selecting a random example for user inspiration
   const randomIndex = Math.floor(Math.random() * EXAMPLE_PROMPTS.length)
   return EXAMPLE_PROMPTS[randomIndex]
 }
