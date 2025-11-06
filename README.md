@@ -42,6 +42,8 @@ Generates lyrics with proper Suno AI metatags:
 - Effects: `[Instrumental]`, `[fade out]`, `[build up]`
 
 ### 🚀 Additional Features
+- **Secure Authentication**: Cloudflare Workers-based auth with token system
+- **No API Keys Required**: Users don't need their own OpenRouter API keys
 - **Random Inspiration**: Get creative with one click
 - **Export to .txt**: Download generated content
 - **Dark/Light Theme**: Toggle with persistence
@@ -53,9 +55,11 @@ Generates lyrics with proper Suno AI metatags:
 
 ### Prerequisites
 - Node.js 16+ and npm
+- Cloudflare account (free tier works fine)
+- Wrangler CLI (`npm install -g wrangler`)
 - OpenRouter API key ([Get one here](https://openrouter.ai/keys))
 
-### Installation
+### Quick Setup
 
 1. Clone the repository:
 ```bash
@@ -68,12 +72,38 @@ cd sunoai-music-muse
 npm install
 ```
 
-3. Start the development server:
+3. **Deploy Cloudflare Worker** (see [SETUP.md](SETUP.md) for detailed instructions):
+```bash
+# Install wrangler if not already installed
+npm install -g wrangler
+
+# Login to Cloudflare
+wrangler login
+
+# Deploy the worker
+wrangler deploy
+
+# Set secrets
+wrangler secret put AUTH_TOKEN
+wrangler secret put OPENROUTER_API_KEY
+```
+
+4. **Configure environment**:
+```bash
+cp .env.example .env
+# Edit .env and set VITE_WORKER_API_URL to your deployed worker URL
+```
+
+5. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open your browser to `http://localhost:5000/sunoai-music-muse/`
+6. Open your browser to `http://localhost:5000/sunoai-music-muse/`
+
+7. **Log in** with the AUTH_TOKEN you configured in step 3
+
+For detailed setup instructions, including secrets configuration and deployment, see [SETUP.md](SETUP.md).
 
 ### Building for Production
 
@@ -85,7 +115,7 @@ The build output will be in the `dist/` directory, ready for deployment.
 
 ## 📖 How to Use
 
-1. **Configure API Key**: Click the settings icon (⚙️) in the header and enter your OpenRouter API key
+1. **Log in**: Enter your access token (AUTH_TOKEN configured during setup)
 2. **Choose Your Mode**:
    - **Simple Mode**: Enter a free-form music style description
    - **Advanced Mode**: Use detailed controls for precise specifications

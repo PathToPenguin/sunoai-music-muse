@@ -17,12 +17,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MusicNotes, Gear, Sparkle, Copy, Check, Info, CaretUpDown, MagnifyingGlass, Lightbulb, Download, Moon, Sun, CaretDown, Warning, X } from '@phosphor-icons/react'
+import { MusicNotes, Gear, Sparkle, Copy, Check, Info, CaretUpDown, MagnifyingGlass, Lightbulb, Download, Moon, Sun, CaretDown, Warning, X, SignOut } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { validateCopyrightText, stripCopyrightedContent } from '@/lib/copyright-validation'
 import { EXAMPLE_PROMPTS, getRandomExample, type ExamplePrompt } from '@/lib/example-prompts'
+import { LoginDialog } from '@/components/LoginDialog'
 
 interface GeneratedContent {
   lyrics: string
@@ -91,12 +92,17 @@ const VOCAL_DELIVERIES = ['Soft', 'Powerful', 'Raspy', 'Airy', 'Rap', 'Sung', 'W
 const SONG_STRUCTURES = ['Verse-Chorus', 'Verse-Chorus-Bridge', 'AABA', 'Through-composed', 'Custom']
 
 function App() {
+  // Authentication state
+  const [authToken, setAuthToken] = useKV<string>('auth-token', '')
+  const [showLoginDialog, setShowLoginDialog] = useState(false)
+  
   // API & Settings
-  const [apiKey, setApiKey] = useState<string>('')
   const [selectedModel, setSelectedModel] = useKV<string>('selected-model', 'openai/gpt-4o')
-  const [tempApiKey, setTempApiKey] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useKV<boolean>('dark-mode', false)
+  
+  // Worker API endpoint - set this to your deployed Cloudflare Worker URL
+  const WORKER_API_URL = import.meta.env.VITE_WORKER_API_URL || 'https://sunoai-music-muse-api.YOUR_SUBDOMAIN.workers.dev'
   
   const [availableModels, setAvailableModels] = useState<OpenRouterModel[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
@@ -136,6 +142,10 @@ function App() {
 
   useEffect(() => {
     fetchAvailableModels()
+    // Show login dialog if no auth token
+    if (!authToken) {
+      setShowLoginDialog(true)
+    }
   }, [])
   
   // Apply dark mode
@@ -189,10 +199,17 @@ function App() {
 
   const selectedModelData = availableModels.find(m => m.id === selectedModel)
 
-  const handleSaveApiKey = () => {
-    setApiKey(tempApiKey.trim())
-    toast.success('API key saved for this session')
-    setIsSettingsOpen(false)
+  const handleAuthenticated = (token: string) => {
+    setAuthToken(token)
+    setShowLoginDialog(false)
+    toast.success('Successfully authenticated!')
+  }
+  
+  const handleLogout = () => {
+    setAuthToken('')
+    setShowLoginDialog(true)
+    setGeneratedContent(null)
+    toast.info('Logged out successfully')
   }
   
   const loadExample = (example: ExamplePrompt) => {
@@ -281,8 +298,9 @@ Generated: ${new Date().toLocaleString()}
   }
 
   const handleGenerate = async () => {
-    if (!apiKey) {
-      setError('Please configure your API key in settings first')
+    if (!authToken) {
+      setError('Please log in first')
+      setShowLoginDialog(true)
       return
     }
     
@@ -339,7 +357,7 @@ Example format:
 [Outro]
 [fade out]`
       
-      const prompt = `You are a creative songwriting assistant. Generate ${isInstrumental ? 'an instrumental music description' : 'original song lyrics'} and a SunoAI prompt based on the following specifications:
+      const promptContent = `You are a creative songwriting assistant. Generate ${isInstrumental ? 'an instrumental music description' : 'original song lyrics'} and a SunoAI prompt based on the following specifications:
 
 Music Style: ${cleanedStyle}
 Language: ${language}
@@ -358,17 +376,17 @@ Return your response in the following JSON format:
   "prompt": "A concise SunoAI-style prompt describing the music style (under 120 characters)"
 }`
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      // Call Cloudflare Worker instead of OpenRouter directly
+      const response = await fetch(WORKER_API_URL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
         },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
-            { role: 'user', content: prompt }
+            { role: 'user', content: promptContent }
           ],
           response_format: { type: 'json_object' }
         })
@@ -376,7 +394,12 @@ Return your response in the following JSON format:
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || `API request failed: ${response.statusText}`)
+        if (response.status === 401) {
+          setAuthToken('')
+          setShowLoginDialog(true)
+          throw new Error('Authentication failed. Please log in again.')
+        }
+        throw new Error(errorData.error || `API request failed: ${response.statusText}`)
       }
 
       const data = await response.json()
@@ -426,6 +449,12 @@ Return your response in the following JSON format:
           </div>
           
           <div className="flex items-center gap-2">
+            {authToken && (
+              <Badge variant="secondary" className="bg-primary/10 text-primary">
+                Authenticated
+              </Badge>
+            )}
+            
             <Button
               variant="ghost"
               size="icon"
@@ -435,50 +464,16 @@ Return your response in the following JSON format:
               {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </Button>
             
-            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => setTempApiKey(apiKey || '')}>
-                  <Gear size={20} />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>API Configuration</DialogTitle>
-                  <DialogDescription>
-                    Configure your OpenRouter API key and model selection for content generation.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="api-key">OpenRouter API Key</Label>
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder="sk-or-v1-..."
-                      value={tempApiKey}
-                      onChange={(e) => setTempApiKey(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Your API key is stored only in this session and will be cleared when you close the browser
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Get your API key from{' '}
-                      <a 
-                        href="https://openrouter.ai/keys" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        openrouter.ai/keys
-                      </a>
-                    </p>
-                  </div>
-                  <Button onClick={handleSaveApiKey} className="w-full">
-                    Save API Key
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {authToken && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleLogout}
+                title="Logout"
+              >
+                <SignOut size={20} />
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -502,7 +497,7 @@ Return your response in the following JSON format:
                   <div>
                     <h4 className="font-semibold mb-1">Getting Started:</h4>
                     <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                      <li>Configure your OpenRouter API key in settings (top right)</li>
+                      <li>Log in with your access token (provided by the repository owner)</li>
                       <li>Choose between Simple Mode (free-form text) or Advanced Mode (detailed controls)</li>
                       <li>Describe your desired music style without naming specific artists</li>
                       <li>Click Generate to create original lyrics and a SunoAI prompt</li>
@@ -588,15 +583,6 @@ Return your response in the following JSON format:
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Generation Settings</h2>
-                <div className="flex items-center gap-3">
-                  {apiKey ? (
-                    <Badge variant="secondary" className="bg-primary/10 text-primary">
-                      API Configured
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive">API Not Configured</Badge>
-                  )}
-                </div>
               </div>
 
               {error && (
@@ -978,6 +964,9 @@ Return your response in the following JSON format:
           <p>Generate original song content for SunoAI • No copyrighted content</p>
         </div>
       </footer>
+      
+      {/* Login Dialog */}
+      <LoginDialog open={showLoginDialog} onAuthenticated={handleAuthenticated} />
     </div>
   )
 }
