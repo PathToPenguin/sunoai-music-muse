@@ -1,0 +1,16 @@
+name = "sunoai-music-muse-api"
+main = "workers/generate.ts"
+compatibility_date = "2024-01-01"
+
+# Workers Routes configuration
+# The worker will be deployed at: https://sunoai-music-muse-api.<your-subdomain>.workers.dev
+
+# Environment variables (DO NOT commit actual values)
+# Set these in Cloudflare Dashboard or using wrangler secret
+[vars]
+# AUTH_TOKEN = "your-secure-token-here" (Set via: wrangler secret put AUTH_TOKEN)
+# OPENROUTER_API_KEY = "sk-or-v1-..." (Set via: wrangler secret put OPENROUTER_API_KEY)
+
+# To set secrets, run:
+# wrangler secret put AUTH_TOKEN
+# wrangler secret put OPENROUTER_API_KEY
